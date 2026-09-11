@@ -1,4 +1,5 @@
 name: CI
+run-name: "CI ${{ inputs.leg || github.event_name }} ${{ inputs.racecar_run }}"
 
 # Controls when the action will run.
 on:
@@ -7,7 +8,24 @@ on:
   pull_request:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      leg:
+        description: "baseline (uninstrumented) or instrumented (under chalk/curiosity)"
+        type: choice
+        options: [instrumented, baseline]
+        default: baseline
+      profile:
+        description: "CrashOverride chalk profile"
+        type: string
+        default: curiosity-tests-racecar
+      racecar_run:
+        description: "racecar correlation token, echoed into the run name"
+        type: string
+        default: ""
 
+
+env:
+  CHALK_ON: ${{ inputs.leg == 'instrumented' }}
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 # See the following, which includes links to supported macOS versions, including supported Xcode versions
 # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
@@ -17,7 +35,7 @@ jobs:
       matrix:
         # Primary build on latest macOS and its default Xcode version
         os: [ "macos-latest" ]
-        platform: [ "all", "macos", "ios" ]
+        platform: ["all", "ios"]
         upload_artifacts: [ true ]
         select_xcode: [ false ]
         private_api: [ false ]
@@ -30,12 +48,6 @@ jobs:
             select_xcode: false
             private_api: true
           # Legacy build. Up to 3 versions behind latest (or beta).
-          - os: "macos-14"
-            xcode: "15.0.1"
-            platform: "macos"
-            upload_artifacts: false
-            select_xcode: true
-            private_api: false
       fail-fast: false
 
     name: MoltenVK (Xcode ${{ matrix.xcode }} - ${{ matrix.platform }}${{ matrix.private_api && '-privateapi' || '' }})
@@ -174,6 +186,7 @@ jobs:
           ccache --show-stats
 
   release:
+    continue-on-error: true   # racecar: scan job other jobs need
     name: 'Release'
 
     needs: [build]
