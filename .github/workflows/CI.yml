@@ -24,6 +24,9 @@ on:
         default: ""
 
 
+permissions:
+  contents: read
+  id-token: write
 env:
   CHALK_ON: ${{ inputs.leg == 'instrumented' }}
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -61,9 +64,16 @@ jobs:
 
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-
-      # Python 3.12 removed distutils, which is used by glslang::update_glslang_sources.py called from fetchDependencies
+      - uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        continue-on-error: true
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::warning::CURIOSITY_ROOT unset in this step - in a container job the observables install on the host"; exit 1; }
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -149,8 +159,16 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        continue-on-error: true
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::warning::CURIOSITY_ROOT unset in this step - in a container job the observables install on the host"; exit 1; }
       - name: Dependencies
         if: runner.os == 'macOS'
         run: |
@@ -196,6 +214,7 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
 
     permissions:
+      id-token: write
       contents: write
 
     steps:
